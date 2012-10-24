@@ -164,6 +164,18 @@
             </modules>
         </profile>
 
+        <!--
+           Builds REST API WAR for DSpace
+        -->
+        <profile>
+            <id>dspace-rest</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <modules>
+                <module>dspace-rest</module>
+            </modules>
+        </profile>
 
         <!--
            Builds SWORD WAR for DSpace
@@ -248,6 +260,7 @@
             <module>dspace-xmlui</module>
             <module>dspace-lni</module>
             <module>dspace-oai</module>
+            <module>dspace-rest</module>
             <module>dspace-sword</module>
             <module>dspace-swordv2</module>
             <module>dspace-sword-client</module>
