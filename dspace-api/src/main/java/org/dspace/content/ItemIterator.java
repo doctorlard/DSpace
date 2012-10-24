@@ -240,6 +240,17 @@ public class ItemIterator
     }
 
     /**
+     * Skip to the next row, for supporting pagination, required by the
+     * dspace-rest plugin.
+     */
+    public void skip() throws SQLException {
+        if (itemRows.hasNext())
+        {
+            itemRows.next();
+        }
+    }
+
+    /**
      * Dispose of this Iterator, and it's underlying resources
      */
     public void close()
