@@ -8,25 +8,8 @@
 
 package org.dspace.rest.servlet;
 
-import java.util.List;
-import java.util.Vector;
-
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-
-import org.dspace.content.Bundle;
 import org.dspace.core.ConfigurationManager;
-import org.dspace.rest.data.bundle.BundleEntityId;
-import org.dspace.rest.providers.AbstractBaseProvider;
-import org.dspace.rest.providers.BitstreamProvider;
-import org.dspace.rest.providers.CollectionsProvider;
-import org.dspace.rest.providers.CommunitiesProvider;
-import org.dspace.rest.providers.GroupProvider;
-import org.dspace.rest.providers.HarvestProvider;
-import org.dspace.rest.providers.ItemsProvider;
-import org.dspace.rest.providers.SearchProvider;
-import org.dspace.rest.providers.StatsProvider;
-import org.dspace.rest.providers.UserProvider;
+import org.dspace.rest.providers.*;
 import org.sakaiproject.entitybus.EntityBrokerManager;
 import org.sakaiproject.entitybus.entityprovider.EntityProviderManager;
 import org.sakaiproject.entitybus.impl.EntityBrokerCoreServiceManager;
@@ -34,13 +17,11 @@ import org.sakaiproject.entitybus.providers.EntityRequestHandler;
 import org.sakaiproject.entitybus.rest.EntityBrokerRESTServiceManager;
 import org.sakaiproject.entitybus.util.servlet.DirectServlet;
 
-/**
- * Main class, here is started and initialized servlet, providers registered
- * @see BundleEntityId
- * @see Bundle
- * @author Bojan Suzic, bojan.suzic@gmail.com
- * Based on Aaron Zeckoski's SakaiProject.EntityBus
- */
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.util.List;
+import java.util.Vector;
+
 public class DS16DirectServlet extends DirectServlet {
 
     private static final long serialVersionUID = 2L;
@@ -48,11 +29,6 @@ public class DS16DirectServlet extends DirectServlet {
     private transient EntityBrokerRESTServiceManager entityRESTServiceManager;
     private transient List<AbstractBaseProvider> entityProviders;
 
-    /**
-     * Starts up all the entity providers, new providers should be added
-     * to the list
-     * @param entityProviderManager the provider manager
-     */
     protected void startProviders(EntityProviderManager entityProviderManager) throws java.sql.SQLException, NoSuchMethodException {
         String config = getServletContext().getInitParameter("dspace-config");
 
@@ -72,6 +48,8 @@ public class DS16DirectServlet extends DirectServlet {
         this.entityProviders.add(new SearchProvider(entityProviderManager));
         this.entityProviders.add(new HarvestProvider(entityProviderManager));
         this.entityProviders.add(new GroupProvider(entityProviderManager));
+        this.entityProviders.add(new WorkflowProvider(entityProviderManager));
+        this.entityProviders.add(new SubmissionProvider(entityProviderManager));
     }
 
     @Override
@@ -134,5 +112,5 @@ public class DS16DirectServlet extends DirectServlet {
     @Override
     public void handleUserLogin(HttpServletRequest req, HttpServletResponse res, String path) {
         // login is implemented in AbstractBaseProvider, per request
-    }    
+    }
 }

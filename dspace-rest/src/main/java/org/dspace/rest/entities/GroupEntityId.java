@@ -8,52 +8,49 @@
 
 package org.dspace.rest.entities;
 
-import java.sql.SQLException;
-
+import org.dspace.authorize.AuthorizeException;
+import org.dspace.authorize.AuthorizeManager;
+import org.dspace.core.Constants;
 import org.dspace.core.Context;
 import org.dspace.eperson.Group;
+import org.sakaiproject.entitybus.entityprovider.annotations.EntityId;
+import org.sakaiproject.entitybus.exception.EntityException;
 
-/**
- * Entity describing users registered on the system, basic version
- * @see GroupEntity
- * @see EGroup
- * @author Bojan Suzic, bojan.suzic@gmail.com
- */
+import java.sql.SQLException;
+
 public class GroupEntityId {
 
-    private final int id;
+    @EntityId
+    protected int id;
+    protected Group res;
 
-    public GroupEntityId(String uid, Context context) throws SQLException {
-        this(Group.find(context, Integer.parseInt(uid)));
+    protected GroupEntityId() {
     }
 
-    public GroupEntityId(Group eperson) throws SQLException {
-        this.id = eperson.getID();
+    public GroupEntityId(String uid, Context context) {
+        try {
+
+            res = Group.find(context, Integer.parseInt(uid));
+            // Check authorisation
+            AuthorizeManager.authorizeAction(context, res, Constants.READ);
+
+            this.id = res.getID();
+            //context.complete();
+        } catch (SQLException ex) {
+            throw new EntityException("Internal server error", "SQL error", 500);
+        } catch (AuthorizeException ex) {
+            throw new EntityException("Forbidden", "Forbidden", 403);
+        } catch (NumberFormatException ex) {
+            throw new EntityException("Bad request", "Could not parse input", 400);
+        }
+    }
+
+    public GroupEntityId(Group group) {
+        this.id = group.getID();
     }
 
     public int getId() {
         return id;
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        if (null == obj) {
-            return false;
-        }
-        if (!(obj instanceof GroupEntityId)) {
-            return false;
-        } else {
-            GroupEntityId castObj = (GroupEntityId) obj;
-            return (this.id == castObj.id);
-        }
-    }
-
-    @Override
-    public int hashCode() {
-        final int prime = 31;
-        int result = 1;
-        result = prime * result + id;
-        return result;
     }
 
     @Override

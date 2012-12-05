@@ -7,34 +7,18 @@
  */
 package org.dspace.rest.entities;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import org.dspace.core.ConfigurationManager;
+import org.dspace.core.Context;
+import org.sakaiproject.entitybus.entityprovider.annotations.EntityId;
+
+import java.io.*;
 import java.sql.SQLException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.dspace.core.ConfigurationManager;
-import org.dspace.core.Context;
-import org.dspace.rest.providers.StatsProvider;
-import org.sakaiproject.entitybus.entityprovider.annotations.EntityId;
-
-/**
- * Entity describing basic system statistics
- * @see StatsProvider
- * @author Bojan Suzic, bojan.suzic@gmail.com
- */
 public class StatsEntity {
 
     @EntityId
@@ -182,7 +166,6 @@ public class StatsEntity {
         BufferedReader br = null;
 
 
-
         try {
             List monthsList = new ArrayList();
 
@@ -201,7 +184,6 @@ public class StatsEntity {
                 Date mostRecentDate = null;
 
 
-
                 for (int i = 0; i
                         < reports.length; i++) {
                     Matcher matchGeneral = general.matcher(reports[i].getName());
@@ -209,7 +191,6 @@ public class StatsEntity {
 
                     if (matchGeneral.matches()) {
                         Date parsedDate = null;
-
 
 
                         try {
@@ -242,7 +223,6 @@ public class StatsEntity {
                 String desiredReport = "report-" + date + ".html";
 
 
-
                 for (int i = 0; i
                         < reports.length; i++) {
                     if (reports[i].getName().equals(desiredReport)) {
@@ -270,7 +250,6 @@ public class StatsEntity {
                     Date parsedDate = null;
 
 
-
                     try {
                         parsedDate = sdf.parse(matchReport.group(1).trim());
 
@@ -289,7 +268,6 @@ public class StatsEntity {
             months = (Date[]) monthsList.toArray(months);
 
             Arrays.sort(months);
-
 
 
             try {

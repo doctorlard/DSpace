@@ -8,11 +8,6 @@
 
 package org.dspace.rest.entities;
 
-
-/**
- * Entity describing Harvesting results
- * @author Bojan Suzic, bojan.suzic@gmail.com
- */
 public class HarvestResultsInfoEntity {
 
     int resultsCount;
@@ -20,6 +15,7 @@ public class HarvestResultsInfoEntity {
     /**
      * Contains basic informaton on harvesting performed, in this case only
      * results count
+     *
      * @param res number of items founded
      */
     public HarvestResultsInfoEntity(int res) {

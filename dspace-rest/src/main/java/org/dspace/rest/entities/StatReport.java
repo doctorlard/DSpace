@@ -8,20 +8,15 @@
 
 package org.dspace.rest.entities;
 
-import java.text.DateFormat;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-
 import org.dspace.app.statistics.Report;
 import org.dspace.app.statistics.Stat;
 import org.dspace.app.statistics.Statistics;
 import org.sakaiproject.entitybus.entityprovider.annotations.EntityId;
 
+import java.text.DateFormat;
+import java.util.*;
+
 /**
- *
  * @author Bojan Suzic
  */
 public class StatReport implements Report {
@@ -158,7 +153,7 @@ public class StatReport implements Report {
         blocks.add(stat);
     }
 
-    
+
     @Override
     public String render() {
         Iterator<Statistics> statSets = blocks.iterator();

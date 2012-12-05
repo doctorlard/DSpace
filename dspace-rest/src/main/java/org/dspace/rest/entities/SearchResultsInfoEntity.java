@@ -8,29 +8,26 @@
 
 package org.dspace.rest.entities;
 
+import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Entity decribing search results
- * @author Bojan Suzic, bojan.suzic@gmail.com
- */
 public class SearchResultsInfoEntity {
 
-    private final int resultsCount;
-    private final List<Object> resultTypes;
-    private final List<Object> resultHandles;
-    private final List<Object> resultsIDs;
+    int resultsCount;
+    List<Object> resultTypes = new ArrayList<Object>();
+    List<Object> resultHandles = new ArrayList<Object>();
+    List<Object> resultsIDs = new ArrayList<Object>();
 
     /**
      * Constructs SearchResultsInfoEntity, which should contain basic info
      * on results of search performed
-     * 
-     * @param res number of results
-     * @param types list including types (DAO entity type) of results
+     *
+     * @param res     number of results
+     * @param types   list including types (DAO entity type) of results
      * @param handles list including handles (DAO handle) of results
-     * @param ids list including ids of results
+     * @param ids     list including ids of results
      */
-    public SearchResultsInfoEntity(int res, List<Object> types, List<Object> handles, List<Object> ids) {
+    public SearchResultsInfoEntity(int res, List types, List handles, List ids) {
         this.resultsCount = res;
         this.resultTypes = types;
         this.resultHandles = handles;
@@ -41,15 +38,24 @@ public class SearchResultsInfoEntity {
         return this.resultsCount;
     }
 
-    public List<Object> getResultTypes() {
+    public List<?> getResultTypes() {
         return this.resultTypes;
     }
 
-    public List<Object> getResultHandles() {
+    public List<?> getResultHandles() {
         return this.resultHandles;
     }
 
-    public List<Object> getResultIDs() {
+    public List<?> getResultIDs() {
         return this.resultsIDs;
+    }
+
+    // these are added for sorting management
+    public String getName() {
+        return "";
+    }
+
+    public int getId() {
+        return 0;
     }
 }

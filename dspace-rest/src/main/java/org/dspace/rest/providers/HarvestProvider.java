@@ -8,40 +8,28 @@
 
 package org.dspace.rest.providers;
 
-import java.sql.SQLException;
-import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.List;
-
-import org.dspace.core.Context;
-import org.dspace.rest.data.DSpace;
-import org.dspace.rest.diagnose.ErrorDetail;
-import org.dspace.rest.diagnose.Operation;
-import org.dspace.rest.diagnose.RequestFormatEntityException;
-import org.dspace.rest.diagnose.SQLFailureEntityException;
-import org.dspace.rest.entities.HarvestResultsInfoEntity;
-import org.dspace.rest.params.DurationParameters;
-import org.dspace.rest.params.PaginationParameters;
-import org.dspace.rest.params.Parameters;
-import org.dspace.search.Harvest;
-import org.dspace.search.HarvestedItemInfo;
 import org.sakaiproject.entitybus.EntityReference;
 import org.sakaiproject.entitybus.entityprovider.CoreEntityProvider;
 import org.sakaiproject.entitybus.entityprovider.EntityProviderManager;
 import org.sakaiproject.entitybus.entityprovider.search.Search;
+import org.dspace.core.Context;
+import java.sql.SQLException;
 import org.sakaiproject.entitybus.exception.EntityException;
+import org.dspace.rest.entities.*;
+import org.dspace.search.*;
+import org.apache.log4j.Logger;
+import java.text.ParseException;
+import org.dspace.rest.util.UserRequestParams;
 
-/**
- * Provides interface for access to harvesting
- * Enables users to harvest items according to several queries, including
- * data range of publication, status of publication, containing elements etc
- * @see HarvestResultsInfoEntity
- * @author Bojan Suzic, bojan.suzic@gmail.com
- */
 public class HarvestProvider extends AbstractBaseProvider implements CoreEntityProvider {
 
-    public HarvestProvider(EntityProviderManager entityProviderManager) throws SQLException {
+    private static Logger log = Logger.getLogger(UserProvider.class);
+
+    public HarvestProvider(EntityProviderManager entityProviderManager) {
         super(entityProviderManager);
+        entityProviderManager.registerEntityProvider(this);
     }
 
     public String getEntityPrefix() {
@@ -53,52 +41,53 @@ public class HarvestProvider extends AbstractBaseProvider implements CoreEntityP
     }
 
     public Object getEntity(EntityReference reference) {
+        log.info(userInfo() + "get_harvest:" + reference.getId());
         throw new EntityException("Not Acceptable", "The data is not available", 406);
     }
 
     public List<?> getEntities(EntityReference ref, Search search) {
-        return getAllHavested();
-    }
+        log.info(userInfo() + "list_harvests");
 
-    private List<?> getAllHavested() {
-        final Parameters parameters = new Parameters(requestStore);
-        final Context context = DSpace.context();
-        final Operation operation = Operation.GET_HARVEST;
-        
+        Context context = null;
         try {
-            final List<Object> entities = new ArrayList<Object>();
-            final List<HarvestedItemInfo>  harvestedItems = harvest(context, parameters);
+            context = new Context();
+            UserRequestParams uparams = refreshParams(context);
 
-            // check results and add entities
-            entities.add(new HarvestResultsInfoEntity(harvestedItems.size()));
-            for (final HarvestedItemInfo harvest: harvestedItems) {
-                entities.add(parameters.toEntity(harvest.item));
+            List<Object> entities = new ArrayList<Object>();
+            List<HarvestedItemInfo> res;
+
+            /**
+             * check requirement for communities and collections, they should be
+             * mutually excluded as underlying architecture accepts searching
+             * in only one subject (community or collection)
+             */
+            if (_community != null) {
+                res = Harvest.harvest(context, _community, _sdate, _edate, _start, _limit, true, true, withdrawn, true);
+            } else if (_collection != null) {
+                res = Harvest.harvest(context, _collection, _sdate, _edate, _start, _limit, true, true, withdrawn, true);
+            } else {
+                res = Harvest.harvest(context, null, _sdate, _edate, _start, _limit, true, true, withdrawn, true);
             }
 
-            // sort entities if the full info are requested and there are sorting fields
-            parameters.sort(entities);
-
-            // format results according to _limit, _perpage etc
-            parameters.removeTrailing(entities);
+            entities.add(new HarvestResultsInfoEntity(res.size()));
+            for (int x = 0; x < res.size(); x++) {
+                entities.add(new ItemEntity(res.get(x).item,uparams));
+            }
 
             return entities;
-        } catch (ParseException cause) {
-            throw new RequestFormatEntityException(operation, cause, ErrorDetail.PARSE_REQUEST_DATE);
-        } catch (SQLException cause) {
-            throw new SQLFailureEntityException(operation, cause);
+        } catch (ParseException ex) {
+            throw new EntityException("Bad request", "Incompatible date format", 400);
+        } catch (SQLException ex) {
+            throw new EntityException("Internal server error", "SQL error", 500);
         } finally {
-            DSpace.complete(context);
+            removeConn(context);
         }
     }
 
-    @SuppressWarnings("unchecked")
-    private List<HarvestedItemInfo> harvest(final Context context, final Parameters parameters)
-            throws SQLException, ParseException {
-        final DurationParameters duration = parameters.getDuration();
-        final PaginationParameters pagination = parameters.getPagination();
-        return (List<HarvestedItemInfo>) Harvest.harvest(context, parameters.getScope(context).scope(), 
-                duration.getStart(), duration.getEnd(), 
-                pagination.getStart(), pagination.getLimit(), 
-                true, true, parameters.getStatus().isWithdrawn(), true);
+    /**
+     * Returns a Entity object with sample data
+     */
+    public Object getSampleEntity() {
+        return null;
     }
 }

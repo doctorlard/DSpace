@@ -6,98 +6,62 @@
  * http://www.dspace.org/license/
  */
 
-
 package org.dspace.rest.providers;
-
-import java.sql.SQLException;
-import java.util.List;
 
 import org.apache.log4j.Logger;
 import org.dspace.content.Collection;
 import org.dspace.core.Context;
-import org.dspace.rest.data.DSpace;
-import org.dspace.rest.data.base.Entity;
-import org.dspace.rest.data.collection.CollectionEntity;
-import org.dspace.rest.data.collection.CollectionEntityId;
-import org.dspace.rest.data.collection.Collections;
-import org.dspace.rest.diagnose.EntityNotFoundException;
-import org.dspace.rest.diagnose.Operation;
-import org.dspace.rest.diagnose.SQLFailureEntityException;
-import org.dspace.rest.params.Parameters;
-import org.dspace.rest.params.Route;
+import org.dspace.rest.content.ContentHelper;
+import org.dspace.rest.entities.CollectionEntity;
+import org.dspace.rest.entities.CollectionEntityTrim;
 import org.sakaiproject.entitybus.EntityReference;
 import org.sakaiproject.entitybus.entityprovider.CoreEntityProvider;
 import org.sakaiproject.entitybus.entityprovider.EntityProviderManager;
+import org.sakaiproject.entitybus.entityprovider.capabilities.Createable;
+import org.sakaiproject.entitybus.entityprovider.capabilities.Deleteable;
+import org.sakaiproject.entitybus.entityprovider.capabilities.Updateable;
 import org.sakaiproject.entitybus.entityprovider.search.Search;
+import org.sakaiproject.entitybus.exception.EntityException;
 
-/**
- * Provides interface for access to collections entities
- * @see CollectionEntity
- * @see CollectionEntityId
- * @author Bojan Suzic, bojan.suzic@gmail.com
- */
-public class CollectionsProvider extends AbstractBaseProvider implements CoreEntityProvider {
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
 
-    public static class CollectionBinder extends Binder{
-    
-        @Override
-        protected Object value(String collectionId, Parameters parameters,
-                Context context, String attributeSegment) throws SQLException {
-            if("id".equals(attributeSegment)) {
-                return parameters.collectionEntity(collectionId, context).getId();
-            } else if("id".equals(attributeSegment)) {
-                return parameters.collectionEntity(collectionId, context).getId();
-            } else if("name".equals(attributeSegment)) {
-                return parameters.collectionEntity(collectionId, context).getName();
-            } else if("licence".equals(attributeSegment)) {
-                return parameters.collectionEntity(collectionId, context).getLicence();
-            } else if("items".equals(attributeSegment)) {
-                switch (parameters.getEntityBuild().getFetchGroup()) {
-                    case LIGHT:
-                        return parameters.lightCollectionWithItems(collectionId, context);
-                    default:
-                        return parameters.collectionEntity(collectionId, context).getItems();
-                }
-            } else if("handle".equals(attributeSegment)) {
-                return parameters.collectionEntity(collectionId, context).getHandle();
-            } else if("canedit".equals(attributeSegment)) {
-                return parameters.collectionEntity(collectionId, context).getCanEdit();
-            } else if("communities".equals(attributeSegment)) {
-                return parameters.collectionEntity(collectionId, context).getCommunities();
-            } else if("countItems".equals(attributeSegment)) {
-                return parameters.collectionEntity(collectionId, context).getCountItems();
-            } else if("type".equals(attributeSegment)) {
-                return parameters.collectionEntity(collectionId, context).getType();
-            } else if("shortDescription".equals(attributeSegment)) {
-                return parameters.collectionEntity(collectionId, context).getShortDescription();
-            } else if("introText".equals(attributeSegment)) {
-                return parameters.collectionEntity(collectionId, context).getIntroText();
-            } else if("copyrightText".equals(attributeSegment)) {
-                return parameters.collectionEntity(collectionId, context).getCopyrightText();
-            } else if("sidebarText".equals(attributeSegment)) {
-                return parameters.collectionEntity(collectionId, context).getSidebarText();
-            } else if("provenance".equals(attributeSegment)) {
-                return parameters.collectionEntity(collectionId, context).getProvenance();
-            } else if("logo".equals(attributeSegment)) {
-                return parameters.collectionEntity(collectionId, context).getLogo();
-            } else {
-                return null;
-            }
-        }
+public class CollectionsProvider extends AbstractBaseProvider implements CoreEntityProvider, Createable, Updateable, Deleteable {
 
-        @Override
-        protected Operation operation() {
-            return Operation.GET_COLLECTIONS;
-        }
-        
-    }
+    private static Logger log = Logger.getLogger(UserProvider.class);
 
-    private static Logger log = Logger.getLogger(CollectionsProvider.class);
-    private final Binder binder;
-
-    public CollectionsProvider(EntityProviderManager entityProviderManager) throws SQLException, NoSuchMethodException {
+    public CollectionsProvider(EntityProviderManager entityProviderManager) throws NoSuchMethodException {
         super(entityProviderManager);
-        this.binder = new CollectionsProvider.CollectionBinder();
+        entityProviderManager.registerEntityProvider(this);
+        processedEntity = CollectionEntity.class;
+        func2actionMapGET.put("getCount", "count");
+        func2actionMapGET.put("getItemsCount", "itemscount");
+        func2actionMapGET.put("getItems", "items");
+        func2actionMapGET.put("getRoles", "roles");
+        func2actionMapGET.put("getAdmin", "admin");
+        func2actionMapGET.put("getSubmit", "submit");
+        func2actionMapGET.put("getWFStep1", "workflow_step_1");
+        func2actionMapGET.put("getWFStep2", "workflow_step_2");
+        func2actionMapGET.put("getWFStep3", "workflow_step_3");
+        func2actionMapGET.put("getLogo", "logo");
+        func2actionMapGET.put("getPolicies", "policies");
+        func2actionMapPOST.put("createCollection", "");
+        inputParamsPOST.put("createCollection", new String[]{"name", "communityId"});
+        func2actionMapPOST.put("createAdmin", "admin");
+        func2actionMapPOST.put("createSubmit", "submit");
+        func2actionMapPOST.put("createWFStep1", "workflow_step_1");
+        func2actionMapPOST.put("createWFStep2", "workflow_step_2");
+        func2actionMapPOST.put("createWFStep3", "workflow_step_3");
+        func2actionMapPOST.put("createLogo", "logo");
+        func2actionMapPOST.put("createPolicies", "policies");
+        func2actionMapPUT.put("editCollection", "");
+        func2actionMapDELETE.put("removeCollection", "");
+        func2actionMapDELETE.put("removeRoles", "roles");
+        func2actionMapDELETE.put("removeLogo", "logo");
+        func2actionMapDELETE.put("removePolicies", "policies");
+        entityConstructor = processedEntity.getDeclaredConstructor();
+        initMappings(processedEntity);
     }
 
     public String getEntityPrefix() {
@@ -105,94 +69,84 @@ public class CollectionsProvider extends AbstractBaseProvider implements CoreEnt
     }
 
     public boolean entityExists(String id) {
-        // sample entity
-        if (id.equals(":ID:")) {
+        log.info(userInfo() + "collection_exists:" + id);
+
+        try {
+            Integer.parseInt(id);
+        } catch (NumberFormatException ex) {
             return true;
         }
 
-        final Context context = DSpace.context();
+        Context context = null;
         try {
-            return Collection.find(context, Integer.parseInt(id)) != null;
+            context = new Context();
+            refreshParams(context);
+
+            Collection comm = Collection.find(context, Integer.parseInt(id));
+            return comm != null ? true : false;
         } catch (SQLException ex) {
-            log.debug("Failed to find collections. Assuming that this means it doesn't exist.", ex);
-            return false;
+            throw new EntityException("Internal server error", "SQL error", 500);
         } finally {
-            DSpace.complete(context);
+            removeConn(context);
         }
     }
 
-    /**
-     * Returns information about particular entity
-     * @param reference
-     * @return
-     */
-    @Override
-    public Object getEntity(EntityReference reference) {
-        final String id = reference.getId();
-        // sample entity
-        if (id == null || ":ID:".equals(id)) {
-            return getSampleEntity();
-        }
-        return entity(id);
-    }
+    public Object getEntity(EntityReference ref) {
+        log.info(userInfo() + "get_collection:" + ref.getId());
+        String segments[] = getSegments();
 
-    private Object entity(final String id) {
-        final Operation operation = Operation.GET_COLLECTIONS;
-        final Context context = DSpace.context();
-        try {
-            final Parameters parameters = new Parameters(requestStore);
-            final Route route = new Route(requestStore);
-
-            if (route.isAttribute()) {
-                log.debug("Using generic entity binding");
-                return binder.resolve(id, route, parameters, context);
-            } else {
-                if (entityExists(id)) {
-                    // return basic entity or full info
-                    return parameters.collection(id, context);
-
-                } else {
-                    if (log.isDebugEnabled()) log.debug("Cannot find entity " + id);
-                    throw new EntityNotFoundException(operation);
-                }
+        if (segments.length > 3) {
+            if (segments[3].startsWith("roles")) {
+                return super.getEntity(ref, segments[segments.length - 1]);
             }
-        } catch (SQLException cause) {
-            if (log.isDebugEnabled()) log.debug("Cannot find entity " + id);
-            throw new SQLFailureEntityException(operation, cause);
-
-        } finally {
-            DSpace.complete(context);
+            return super.getEntity(ref);
+        } else {
+            try {
+                Integer.parseInt(ref.getId());
+            } catch (NumberFormatException ex) {
+                return super.getEntity(ref, ref.getId());
+            }
         }
-    }
 
-    /**
-     * List all collection in the system, sort and format if requested
-     * @param ref
-     * @param search
-     * @return
-     */
-    public List<?> getEntities(EntityReference ref, Search search) {
-        return getAllCollections();
-    }
-
-    private List<?> getAllCollections() {
-        Operation operation = Operation.GET_COLLECTIONS;
-        final Parameters parameters = new Parameters(requestStore);
-        final Context context = DSpace.context();
+        Context context = null;
         try {
-            final Collection[] collections = Collection.findAll(context);
-            
-            final List<Entity> entities = Collections.build(parameters, collections);
-            
-            parameters.sort(entities);
-            parameters.removeTrailing(entities);
+            context = new Context();
+            refreshParams(context);
+
+            if (entityExists(ref.getId())) {
+                return new CollectionEntity(ref.getId(), context);
+            }
+        } catch (SQLException ex) {
+            throw new EntityException("Internal server error", "SQL error", 500);
+        } finally {
+            removeConn(context);
+        }
+        throw new IllegalArgumentException("Invalid id:" + ref.getId());
+    }
+
+    public List<?> getEntities(EntityReference ref, Search search) {
+        log.info(userInfo() + "list_collections");
+
+        Context context = null;
+        try {
+            context = new Context();
+            refreshParams(context);
+
+            List<Object> entities = new ArrayList<Object>();
+            Collection[] collections = ContentHelper.findAllCollection(context, _start, _limit);
+            for (Collection c : collections) {
+                entities.add(trim ? new CollectionEntityTrim(c) : new CollectionEntity(c));
+            }
 
             return entities;
-
-        } catch (SQLException cause) {
-            throw new SQLFailureEntityException(operation, cause);
+        } catch (SQLException ex) {
+            throw new EntityException("Internal server error", "SQL error", 500);
         } finally {
-            DSpace.complete(context);
+            removeConn(context);
         }
+    }
+
+    public Object getSampleEntity() {
+        return new CollectionEntity();
     }
 }

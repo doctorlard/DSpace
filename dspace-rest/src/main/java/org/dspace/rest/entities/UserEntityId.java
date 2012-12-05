@@ -8,42 +8,49 @@
 
 package org.dspace.rest.entities;
 
+import org.dspace.authorize.AuthorizeException;
+import org.dspace.authorize.AuthorizeManager;
+import org.dspace.core.Constants;
+import org.dspace.core.Context;
+import org.dspace.eperson.EPerson;
+import org.sakaiproject.entitybus.entityprovider.annotations.EntityId;
+import org.sakaiproject.entitybus.exception.EntityException;
 
-/**
- * Entity describing users registered on the system, basic version
- * @author Bojan Suzic, bojan.suzic@gmail.com
- */
+import java.sql.SQLException;
+
 public class UserEntityId {
 
-    private final int id;
+    @EntityId
+    protected int id;
+    protected EPerson res;
 
-    public UserEntityId(final String id) {
-    	this(Integer.parseInt(id));
-    }
-	
-    public UserEntityId(final int id) {
-    	this.id = id;
+    protected UserEntityId() {
     }
 
-    public final int getId() {
-        return id;
-    }
+    public UserEntityId(String uid, Context context) {
+        try {
+            try {
+                int id = Integer.parseInt(uid);
+                res = EPerson.find(context, id);
+            } catch (NumberFormatException ex) {
+                res = EPerson.findByEmail(context, uid);
+            }
 
-    @Override
-    public boolean equals(final Object obj) {
-        if (null == obj) {
-            return false;
+            AuthorizeManager.authorizeAction(context, res, Constants.READ);
+
+            this.id = res.getID();
+        } catch (SQLException ex) {
+            throw new EntityException("Internal server error", "SQL error", 500);
+        } catch (AuthorizeException ex) {
+            throw new EntityException("Forbidden", "Forbidden", 403);
         }
-        if (!(obj instanceof UserEntityId)) {
-            return false;
-        } else {
-            UserEntityId castObj = (UserEntityId) obj;
-            return (this.id == castObj.id);
-        }
     }
 
-    @Override
-    public int hashCode() {
+    public UserEntityId(EPerson eperson) {
+        this.id = eperson.getID();
+    }
+
+    public int getId() {
         return id;
     }
 

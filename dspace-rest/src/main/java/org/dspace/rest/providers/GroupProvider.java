@@ -8,77 +8,40 @@
 
 package org.dspace.rest.providers;
 
+import org.apache.log4j.Logger;
+import org.dspace.core.Context;
+import org.dspace.eperson.Group;
+import org.dspace.rest.entities.GroupEntity;
+import org.sakaiproject.entitybus.EntityReference;
+import org.sakaiproject.entitybus.entityprovider.CoreEntityProvider;
+import org.sakaiproject.entitybus.entityprovider.EntityProviderManager;
+import org.sakaiproject.entitybus.entityprovider.capabilities.Deleteable;
+import org.sakaiproject.entitybus.entityprovider.capabilities.Updateable;
+import org.sakaiproject.entitybus.entityprovider.search.Search;
+import org.sakaiproject.entitybus.exception.EntityException;
+
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.log4j.Logger;
-import org.dspace.core.Context;
-import org.dspace.eperson.Group;
-import org.dspace.rest.data.DSpace;
-import org.dspace.rest.diagnose.EntityNotFoundException;
-import org.dspace.rest.diagnose.Operation;
-import org.dspace.rest.diagnose.SQLFailureEntityException;
-import org.dspace.rest.entities.GroupEntity;
-import org.dspace.rest.entities.GroupEntityId;
-import org.dspace.rest.params.Parameters;
-import org.dspace.rest.params.Route;
-import org.sakaiproject.entitybus.EntityReference;
-import org.sakaiproject.entitybus.entityprovider.CoreEntityProvider;
-import org.sakaiproject.entitybus.entityprovider.EntityProviderManager;
-import org.sakaiproject.entitybus.entityprovider.search.Search;
-
-/**
- * Provides interface for access to user info entities
- * @see GroupEntity
- * @see GroupEntityId
- * @author Bojan Suzic, bojan.suzic@gmail.com
- */
-public class GroupProvider extends AbstractBaseProvider  implements CoreEntityProvider {
-
-    public static class GroupBinder extends Binder{
-    
-        @Override
-        protected Object value(String id, Parameters parameters,
-                Context context, String attributeSegment) throws SQLException {
-            
-            if ("handle".equals(attributeSegment)) {
-                return group(id, parameters, context).getHandle();
-            } else if ("id".equals(attributeSegment)) {
-                return group(id, parameters, context).getId();
-            } else if ("isEmpty".equals(attributeSegment)) {
-                return group(id, parameters, context).getIsEmpty();
-            } else if ("members".equals(attributeSegment)) {
-                return group(id, parameters, context).getMembers();
-            } else if ("memberGroups".equals(attributeSegment)) {
-                return group(id, parameters, context).getMemberGroups();
-            } else if ("name".equals(attributeSegment)) {
-                return group(id, parameters, context).getName();
-            } else if ("type".equals(attributeSegment)) {
-                return group(id, parameters, context).getType();
-            } else {
-                return null;
-            }
-        }
-
-        private GroupEntity group(String id, Parameters parameters,
-                Context context) throws SQLException {
-            return new GroupEntity(id, context, parameters.getDetailDepth().getDepth());
-        }
-    
-        @Override
-        protected Operation operation() {
-            return Operation.GET_GROUP_ENTITIES;
-        }
-        
-    }
+public class GroupProvider extends AbstractBaseProvider implements CoreEntityProvider, Updateable, Deleteable {
 
     private static Logger log = Logger.getLogger(GroupProvider.class);
-    private final Binder binder;
 
-    public GroupProvider(EntityProviderManager entityProviderManager) throws SQLException, NoSuchMethodException {
+    public GroupProvider(EntityProviderManager entityProviderManager) throws NoSuchMethodException {
         super(entityProviderManager);
-        binder = new GroupProvider.GroupBinder();
+        entityProviderManager.registerEntityProvider(this);
+        processedEntity = GroupEntity.class;
+        func2actionMapGET.put("groups", "groups");
+        func2actionMapGET.put("users", "users");
+//        func2actionMapPOST.put("createUser", "users");
+//        inputParamsPOST.put("createUser", new String[]{"email", "firstName", "lastName"});
+        func2actionMapPUT.put("assignGroup", "groups");
+        func2actionMapPUT.put("assignUser", "users");
+        func2actionMapDELETE.put("removeGroup", "groups");
+        func2actionMapDELETE.put("removeUser", "users");
+        entityConstructor = processedEntity.getDeclaredConstructor();
+        initMappings(processedEntity);
     }
 
     public String getEntityPrefix() {
@@ -86,106 +49,71 @@ public class GroupProvider extends AbstractBaseProvider  implements CoreEntityPr
     }
 
     public boolean entityExists(String id) {
-        // sample entity
-        if (id.equals(":ID:")) {
-            return true;
-        }
+        log.info(userInfo() + "group_exists:" + id);
 
-        final Context context = DSpace.context();
+        Context context = null;
         try {
-            return Group.find(context, Integer.parseInt(id)) != null;
+            context = new Context();
+            refreshParams(context);
+
+            Group comm = Group.find(context, Integer.parseInt(id));
+            return comm != null ? true : false;
         } catch (SQLException ex) {
-            log.debug("Failed to find group. Assuming that this means it doesn't exist.", ex);
-            return false;
+            throw new EntityException("Internal server error", "SQL error", 500);
+        } catch (NumberFormatException ex) {
+            throw new EntityException("Bad request", "Could not parse input", 400);
         } finally {
-            DSpace.complete(context);
+            removeConn(context);
         }
     }
 
-    /**
-     * Returns entity containing information about particular user
-     * @param reference
-     * @return
-     */
-    public Object getEntity(EntityReference reference) {
-        final String id = reference.getId();
+    public Object getEntity(EntityReference ref) {
+        log.info(userInfo() + "get_group:" + ref.getId());
+        String segments[] = getSegments();
 
-        // sample entity
-        if (id == null || ":ID:".equals(id)) {
-            return getSampleEntity();
+        if (segments.length > 3) {
+            return super.getEntity(ref);
         }
-        
-        return entity(id);
-    }
 
-    private Object entity(final String id) {
-        final Operation operation = Operation.GET_GROUP_ENTITIES;
-        final Context context = DSpace.context();
+        Context context = null;
         try {
-            final Parameters parameters = new Parameters(requestStore);
-            final Route route = new Route(requestStore);
+            context = new Context();
+            refreshParams(context);
 
-            if (route.isAttribute()) {
-                log.debug("Using generic entity binding");
-                return binder.resolve(id, route, parameters, context);
+            if (entityExists(ref.getId())) {
+                return new GroupEntity(ref.getId(), context);
             }
-
-            if (entityExists(id)) {
-                if (parameters.getEntityBuild().isIdOnly()) {
-                    return new GroupEntityId(id, context);
-                } else {
-                    return new GroupEntity(id, context, parameters.getDetailDepth().getDepth());
-                }
-
-            } else {
-                if (log.isDebugEnabled()) log.debug("Cannot find entity " + id);
-                throw new EntityNotFoundException(operation);
-            }
-        } catch (SQLException cause) {
-            if (log.isDebugEnabled()) log.debug("Cannot find entity " + id);
-            throw new SQLFailureEntityException(operation, cause);
+        } catch (SQLException ex) {
+            throw new EntityException("Internal server error", "SQL error", 500);
         } finally {
-            DSpace.complete(context);
+            removeConn(context);
         }
+        throw new IllegalArgumentException("Invalid id:" + ref.getId());
     }
 
-    /**
-     * Returns the list of groups on the system using GroupEntity
-     * @see GroupEntity
-     * @param ref
-     * @param search
-     * @return
-     */
     public List<?> getEntities(EntityReference ref, Search search) {
-        return getAllGroups();
-    }
+        log.info(userInfo() + "list_groups");
 
-    private List<?> getAllGroups() {
-        final Parameters parameters = new Parameters(requestStore);
-        final Context context = DSpace.context();
+        Context context = null;
         try {
+            context = new Context();
+            refreshParams(context);
+
             List<Object> entities = new ArrayList<Object>();
-
-            final Group[] groups = Group.findAll(context, Group.NAME);
-            if (groups != null) {
-                for (int x = 0; x < groups.length; x++) {
-                    entities.add(parameters.getEntityBuild().isIdOnly() 
-                            ? new GroupEntityId(groups[x]) : 
-                                new GroupEntity(groups[x],1, parameters.getDetailDepth().getDepth()));
-                }
+            Group[] groups = Group.findAll(context, Group.NAME);
+            for (Group g : groups) {
+                entities.add(new GroupEntity(g));
             }
-
-            // do sorting and limiting if necessary
-            parameters.sort(entities);
-            parameters.removeTrailing(entities);
 
             return entities;
-
-        } catch (SQLException cause) {
-            throw new SQLFailureEntityException(Operation.GET_GROUP_ENTITIES, cause);
-
+        } catch (SQLException ex) {
+            throw new EntityException("Internal server error", "SQL error", 500);
         } finally {
-            DSpace.complete(context);
+            removeConn(context);
         }
+    }
+
+    public Object getSampleEntity() {
+        return new GroupEntity();
     }
 }

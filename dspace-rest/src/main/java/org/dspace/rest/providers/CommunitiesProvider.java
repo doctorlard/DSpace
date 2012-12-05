@@ -8,92 +8,50 @@
 
 package org.dspace.rest.providers;
 
-import java.sql.SQLException;
-import java.util.List;
-
 import org.apache.log4j.Logger;
 import org.dspace.content.Community;
 import org.dspace.core.Context;
-import org.dspace.rest.data.DSpace;
-import org.dspace.rest.data.base.DetailDepth;
-import org.dspace.rest.data.base.Entity;
-import org.dspace.rest.data.community.Communities;
-import org.dspace.rest.data.community.CommunityEntity;
-import org.dspace.rest.data.community.CommunityEntityId;
-import org.dspace.rest.diagnose.EntityNotFoundException;
-import org.dspace.rest.diagnose.Operation;
-import org.dspace.rest.diagnose.SQLFailureEntityException;
-import org.dspace.rest.params.Parameters;
-import org.dspace.rest.params.Route;
+import org.dspace.rest.entities.CommunityEntity;
+import org.dspace.rest.entities.CommunityEntityTrim;
+import org.dspace.rest.util.UserRequestParams;
 import org.sakaiproject.entitybus.EntityReference;
 import org.sakaiproject.entitybus.entityprovider.CoreEntityProvider;
 import org.sakaiproject.entitybus.entityprovider.EntityProviderManager;
+import org.sakaiproject.entitybus.entityprovider.capabilities.Createable;
+import org.sakaiproject.entitybus.entityprovider.capabilities.Deleteable;
+import org.sakaiproject.entitybus.entityprovider.capabilities.Updateable;
 import org.sakaiproject.entitybus.entityprovider.search.Search;
+import org.sakaiproject.entitybus.exception.EntityException;
 
-/**
- * Provides interface for access to community entities
- * @see CommunityEntityId
- * @see CommunityEntity
- * @author Bojan Suzic, bojan.suzic@gmail.com
- */
-public class CommunitiesProvider extends AbstractBaseProvider  implements CoreEntityProvider {
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
 
-    private static class CommunitiesBinder extends Binder {
-        @Override
-        protected Object value(String id, Parameters parameters, Context context,
-                String attributeSegment) throws SQLException {
-            final DetailDepth depth = parameters.getDetailDepth().getDepth();
-            if ("id".equals(attributeSegment)) {
-                return community(id, context, depth).getId();
-            } else if ("name".equals(attributeSegment)) {
-                return community(id, context, depth).getName();
-            } else if ("countItems".equals(attributeSegment)) {
-                return community(id, context, depth).getCountItems();
-            } else if ("handle".equals(attributeSegment)) {
-                return community(id, context, depth).getHandle();
-            } else if ("type".equals(attributeSegment)) {
-                return community(id, context, depth).getType();
-            } else if ("collections".equals(attributeSegment)) {
-                return community(id, context, depth).getCollections();
-            } else if ("canedit".equals(attributeSegment)) {
-                return community(id, context, depth).getCanEdit();
-            } else if ("anchestor".equals(attributeSegment)) {
-                return community(id, context, depth).getParentCommunity();
-            } else if ("children".equals(attributeSegment)) {
-                return community(id, context, depth).getSubCommunities();
-            } else if ("recent".equals(attributeSegment)) {
-                return community(id, context, depth).getRecentSubmissions();
-            } else if ("shortDescription".equals(attributeSegment)) {
-                return community(id, context, depth).getShortDescription();
-            } else if ("copyrightText".equals(attributeSegment)) {
-                return community(id, context, depth).getCopyrightText();
-            } else if ("sidebarText".equals(attributeSegment)) {
-                return community(id, context, depth).getSidebarText();
-            } else if ("introductoryText".equals(attributeSegment)) {
-                return community(id, context, depth).getIntroductoryText();
-            } else if ("logo".equals(attributeSegment)) {
-                return community(id, context, depth).getLogo();
-            } else {
-                return null;
-            }
-        }
-
-        private CommunityEntity community(String id, Context context,
-                final DetailDepth depth) throws SQLException {
-            return new Communities(context).community(id, depth);
-        }
-
-        protected Operation operation() {
-            return Operation.GET_COMMUNITIES;
-        }
-    }
+public class CommunitiesProvider extends AbstractBaseProvider implements CoreEntityProvider, Createable, Updateable, Deleteable {
 
     private static Logger log = Logger.getLogger(CommunitiesProvider.class);
-    private final Binder binder;
-    
-    public CommunitiesProvider(EntityProviderManager entityProviderManager) throws SQLException, NoSuchMethodException {
+
+    public CommunitiesProvider(EntityProviderManager entityProviderManager) throws NoSuchMethodException {
         super(entityProviderManager);
-        binder = new CommunitiesProvider.CommunitiesBinder();
+        entityProviderManager.registerEntityProvider(this);
+        processedEntity = CommunityEntity.class;
+        func2actionMapGET.put("getAdministrators", "administrators");
+        func2actionMapGET.put("getLogo", "logo");
+        func2actionMapGET.put("getPolicies", "policies");
+        func2actionMapPOST.put("createCommunity", "");
+        inputParamsPOST.put("createCommunity", new String[]{"name"});
+        func2actionMapPOST.put("createAdministrators", "administrators");
+        inputParamsPOST.put("createAdministrators", new String[]{});
+        func2actionMapPOST.put("createLogo", "logo");
+        func2actionMapPOST.put("createPolicies", "policies");
+        inputParamsPOST.put("createPolicies", new String[]{"action"});
+        func2actionMapPUT.put("editCommunity", "");
+        func2actionMapDELETE.put("removeCommunity", "");
+        func2actionMapDELETE.put("removeAdministrators", "administrators");
+        func2actionMapDELETE.put("removeLogo", "logo");
+        func2actionMapDELETE.put("removePolicies", "policies");
+        entityConstructor = processedEntity.getDeclaredConstructor();
+        initMappings(processedEntity);
     }
 
     public String getEntityPrefix() {
@@ -101,71 +59,71 @@ public class CommunitiesProvider extends AbstractBaseProvider  implements CoreEn
     }
 
     public boolean entityExists(String id) {
-        if (id.equals(":ID:")) {
-            return true;
-        }
+        log.info(userInfo() + "community_exists:" + id);
 
-        final Context context = DSpace.context();
+        Context context = null;
         try {
-            return Community.find(context, Integer.parseInt(id)) != null;
+            context = new Context();
+            refreshParams(context);
+
+            Community comm = Community.find(context, Integer.parseInt(id));
+            return comm != null ? true : false;
         } catch (SQLException ex) {
-            log.debug("Failed to find community. Assuming that this means it doesn't exist.", ex);
-            return false;
+            throw new EntityException("Internal server error", "SQL error", 500);
+        } catch (NumberFormatException ex) {
+            throw new EntityException("Bad request", "Could not parse input", 400);
         } finally {
-            DSpace.complete(context);
+            removeConn(context);
         }
     }
 
-    @Override
-    public Object getEntity(EntityReference reference) {
-        final String id = reference.getId();
-        if (id == null || ":ID:".equals(id)) {
-            return getSampleEntity();
+    public Object getEntity(EntityReference ref) {
+        log.info(userInfo() + "get_community:" + ref.getId());
+        String segments[] = getSegments();
+
+        if (segments.length > 3) {
+            return super.getEntity(ref);
         }
 
-        return entity(id);
-    }
-
-    private Object entity(final String id) {
-        final Operation operation = Operation.GET_COMMUNITIES;
-        final Context context = DSpace.context();
+        Context context = null;
         try {
-            final Parameters parameters = new Parameters(requestStore);
-            final Route route = new Route(requestStore);
-            if (route.isAttribute()) {
-                log.debug("Using generic entity binding");
-                return binder.resolve(id, route, parameters, context);
-            } else {
-                if (entityExists(id)) {
-                    return parameters.community(id, context);
-                } else {
-                    if (log.isDebugEnabled()) log.debug("Cannot find entity " + id);
-                    throw new EntityNotFoundException(operation);
-                }
+            context = new Context();
+            UserRequestParams uparams = refreshParams(context);
+
+            if (entityExists(ref.getId())) {
+                return new CommunityEntity(ref.getId(), context, uparams);
             }
-        } catch (SQLException cause) {
-            if (log.isDebugEnabled()) log.debug("Cannot find entity " + id);
-            throw new SQLFailureEntityException(operation, cause);
+        } catch (SQLException ex) {
+            throw new EntityException("Internal server error", "SQL error", 500);
         } finally {
-            DSpace.complete(context);
+            removeConn(context);
         }
+        throw new IllegalArgumentException("Invalid id:" + ref.getId());
     }
 
-    public List<Entity> getEntities(EntityReference ref, Search search) {
-        return getAllCommunities();
-    }
+    public List<?> getEntities(EntityReference ref, Search search) {
+        log.info(userInfo() + "list_communities");
 
-    
-    private List<Entity> getAllCommunities() {
-        final Parameters parameters = new Parameters(requestStore);
-        final Context context = DSpace.context();
+        Context context = null;
         try {
-            return parameters.communities(context);
-            
-        } catch (SQLException cause) {
-            throw new SQLFailureEntityException(Operation.GET_COMMUNITIES, cause);
+            context = new Context();
+            UserRequestParams uparams = refreshParams(context);
+
+            List<Object> entities = new ArrayList<Object>();
+            Community[] communities = Community.findAllTop(context);
+            for (Community c : communities) {
+                entities.add(trim ? new CommunityEntityTrim(c, uparams) : new CommunityEntity(c, uparams));
+            }
+
+            return entities;
+        } catch (SQLException ex) {
+            throw new EntityException("Internal server error", "SQL error", 500);
         } finally {
-            DSpace.complete(context);
+            removeConn(context);
         }
+    }
+
+    public Object getSampleEntity() {
+        return new CommunityEntity();
     }
 }
